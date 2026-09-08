@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bibelvers-Trainer</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card-bg: #ffffff;
+      --primary: #2b6cb0;
+      --accent: #2f855a;
+      --warn: #c53030;
+      --text: #2d3748;
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); margin: 0; padding: 16px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 480px; }
+    
+    header { text-align: center; margin-bottom: 20px; }
+    h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+    .badge { background: #e2e8f0; font-size: 0.85rem; padding: 4px 10px; border-radius: 12px; }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .reference { font-size: 1.3rem; font-weight: bold; margin-bottom: 12px; color: var(--primary); }
+    .verse-text { font-size: 1.1rem; line-height: 1.5; color: #4a5568; }
+    .hidden { display: none; }
+    
+    .btn {
+      border: none;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-show { background: var(--primary); color: #fff; }
+    .btn-good { background: var(--accent); color: #fff; }
+    .btn-repeat { background: var(--warn); color: #fff; }
+    
+    .actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    
+    /* Eingabebereich */
+    .form-box {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      margin-top: 24px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 0.95rem;
+    }
+    .btn-secondary { background: #e2e8f0; color: #2d3748; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Bibelvers-Trainer</h1>
+    <p><span id="due-count" class="badge">0 Verse heute fällig</span></p>
+  </header>
+
+  <!-- Lernbereich -->
+  <main id="trainer-area">
+    <div class="card">
+      <div id="card-ref" class="reference">Keine Verse fällig! 🎉</div>
+      <div id="card-text" class="verse-text hidden"></div>
+      <div id="card-meta" style="margin-top: 15px; font-size: 0.8rem; color: #a0aec0;"></div>
+    </div>
+
+    <button id="btn-reveal" class="btn btn-show">Text aufdecken</button>
+
+    <div id="rating-buttons" class="actions-grid hidden">
+      <button id="btn-fail" class="btn btn-repeat">Nochmal üben</button>
+      <button id="btn-success" class="btn btn-good">Gewusst</button>
+    </div>
+  </main>
+
+  <!-- Formular für neue Verse -->
+  <section class="form-box">
+    <h3 style="margin-top: 0;">Neuen Vers hinzufügen</h3>
+    <input type="text" id="input-ref" placeholder="Bibelstelle (z.B. Psalm 23,1)" />
+    <textarea id="input-text" rows="3" placeholder="Vers-Text hier eingeben..."></textarea>
+    <button id="btn-add" class="btn btn-secondary">+ Speichern</button>
+  </section>
+</div>
+
+<script>
+  // Intervalle in Tagen: Stufe 0 = sofort, 1 = 7 Tage, 2 = 30 Tage, 3 = 180 Tage, 4 = 365 Tage
+  const INTERVALS = [1, 7, 30, 180, 365];
+
+  // Verse aus dem Handy-Speicher laden oder Beispieldaten setzen
+  let verses = JSON.parse(localStorage.getItem('bible_verses')) || [
+    {
+      id: 1,
+      ref: "Johannes 3,16",
+      text: "Denn also hat Gott die Welt geliebt, dass er seinen eingeborenen Sohn gab, damit alle, die an ihn glauben, nicht verloren werden, sondern das ewige Leben haben.",
+      box: 0,
+      nextDue: Date.now() // sofort fällig
+    }
+  ];
+
+  let currentVerse = null;
+
+  function saveVerses() {
+    localStorage.setItem('bible_verses', JSON.stringify(verses));
+  }
+
+  function getDueVerses() {
+    const now = Date.now();
+    return verses.filter(v => v.nextDue <= now);
+  }
+
+  function renderCard() {
+    const due = getDueVerses();
+    document.getElementById('due-count').innerText = `${due.length} Vers(e) heute fällig`;
+
+    const textEl = document.getElementById('card-text');
+    const refEl = document.getElementById('card-ref');
+    const metaEl = document.getElementById('card-meta');
+    const btnReveal = document.getElementById('btn-reveal');
+    const ratingButtons = document.getElementById('rating-buttons');
+
+    textEl.classList.add('hidden');
+    ratingButtons.classList.add('hidden');
+
+    if (due.length === 0) {
+      refEl.innerText = "Alles erledigt! 🎉";
+      textEl.innerText = "";
+      metaEl.innerText = "Komm morgen wieder oder trage neue Verse ein.";
+      btnReveal.classList.add('hidden');
+      currentVerse = null;
+      return;
+    }
+
+    currentVerse = due[0];
+    refEl.innerText = currentVerse.ref;
+    textEl.innerText = currentVerse.text;
+    metaEl.innerText = `Lernstufe: ${currentVerse.box} (Nächstes Ziel: ${INTERVALS[Math.min(currentVerse.box, INTERVALS.length - 1)]} Tage)`;
+    btnReveal.classList.remove('hidden');
+  }
+
+  // Aufdecken
+  document.getElementById('btn-reveal').addEventListener('click', () => {
+    document.getElementById('card-text').classList.remove('hidden');
+    document.getElementById('btn-reveal').classList.add('hidden');
+    document.getElementById('rating-buttons').classList.remove('hidden');
+  });
+
+  // Bewertung: Gewusst
+  document.getElementById('btn-success').addEventListener('click', () => {
+    if (!currentVerse) return;
+    const currentBox = currentVerse.box || 0;
+    const nextBox = Math.min(currentBox + 1, INTERVALS.length - 1);
+    const daysToAdd = INTERVALS[currentBox];
+
+    currentVerse.box = nextBox;
+    currentVerse.nextDue = Date.now() + (daysToAdd * 24 * 60 * 60 * 1000);
+
+    saveVerses();
+    renderCard();
+  });
+
+  // Bewertung: Nicht gewusst / Nochmal
+  document.getElementById('btn-fail').addEventListener('click', () => {
+    if (!currentVerse) return;
+    currentVerse.box = 0; // Zurück auf Anfang
+    currentVerse.nextDue = Date.now() + (10 * 60 * 1000); // in 10 Min erneut zeigen
+
+    saveVerses();
+    renderCard();
+  });
+
+  // Neuen Vers anlegen
+  document.getElementById('btn-add').addEventListener('click', () => {
+    const ref = document.getElementById('input-ref').value.trim();
+    const text = document.getElementById('input-text').value.trim();
+
+    if (!ref || !text) {
+      alert("Bitte Bibelstelle und Vers-Text eintragen!");
+      return;
+    }
+
+    verses.push({
+      id: Date.now(),
+      ref: ref,
+      text: text,
+      box: 0,
+      nextDue: Date.now()
+    });
+
+    saveVerses();
+    document.getElementById('input-ref').value = '';
+    document.getElementById('input-text').value = '';
+    renderCard();
+  });
+
+  // Initial starten
+  renderCard();
+</script>
+</body>
+</html>
