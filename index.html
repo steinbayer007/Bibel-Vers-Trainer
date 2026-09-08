@@ -57,7 +57,6 @@
     
     .actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     
-    /* Boxen & Eingabefelder */
     .box-panel {
       background: #fff;
       padding: 16px;
@@ -181,7 +180,7 @@
       <summary>💾 Datensicherung & Import (JSON)</summary>
       <div style="margin-top: 14px;">
         <p style="font-size: 0.85rem; color: #718096; margin-top: 0;">
-          Füge hier ein Vers-Paket (JSON-Code) ein, um viele Verse auf einmal hinzuzufügen:
+          Füge hier ein zusätzliches Vers-Paket (JSON-Code) ein:
         </p>
         <textarea id="import-json" rows="4" placeholder='[{"ref":"Psalm 23,1","text":"..."}, ...]'></textarea>
         <button id="btn-import" class="btn btn-show">Verse importieren</button>
@@ -228,10 +227,130 @@
 </div>
 
 <script>
+  // 100 Verse als initiales Standardpaket (Neues Leben Bibel)
+  const DEFAULT_VERSES_DATA = [
+    {"ref": "1. Mose 2,2-3", "text": "Am siebten Tag hatte Gott sein Werk vollendet und ruhte von seiner Arbeit aus. Und Gott segnete den siebten Tag und erklärte ihn für heilig, weil er an diesem Tag von all seiner Schöpfungsarbeit ruhte."},
+    {"ref": "2. Mose 20,8-11", "text": "Denke an den Sabbattag und halte ihn heilig. Sechs Tage sollst du arbeiten und alle deine Arbeiten verrichten. Doch der siebte Tag ist ein Ruhetag, der dem HERRN, deinem Gott, gehört."},
+    {"ref": "2. Mose 31,16-17", "text": "Die Israeliten sollen den Sabbat von Generation zu Generation als ewigen Bund halten. Er ist ein bleibendes Zeichen zwischen mir und den Israeliten."},
+    {"ref": "Hesekiel 20,12", "text": "Ich gab ihnen auch meine Ruhetage als Zeichen des Bundes zwischen ihnen und mir. Sie sollten sie daran erinnern, dass ich der HERR bin, der sie zu seinem heiligen Volk macht."},
+    {"ref": "Jesaja 58,13-14", "text": "Wenn du den Sabbat achtest und an meinem heiligen Tag nicht deinen eigenen Geschäften nachgehst, wenn du den Sabbat einen Tag der Freude nennst [...] dann wirst du Freude am HERRN haben."},
+    {"ref": "Jesaja 66,22-23", "text": "Denn so wie der neue Himmel und die neue Erde, die ich schaffen werde, vor mir Bestand haben werden, spricht der HERR [...] so wird sich die ganze Menschheit von einem Neumond zum anderen und von einem Sabbat zum nächsten vor mir niederwerfen."},
+    {"ref": "Markus 2,27-28", "text": "Dann fügte Jesus hinzu: Der Sabbat ist für den Menschen da und nicht der Mensch für den Sabbat. Deshalb ist der Menschensohn Herr auch über den Sabbat."},
+    {"ref": "Lukas 4,16", "text": "So kam er auch nach Nazareth, wo er aufgewachsen war. Am Sabbat ging er, wie gewohnt, in die Synagoge und stand auf, um aus der Schrift vorzulesen."},
+    {"ref": "Hebräer 4,9-10", "text": "Es wartet also immer noch eine Sabbatruhe auf das Volk Gottes. Denn wer in die Ruhe Gottes eingegangen ist, der ruht von seinen Werken aus, so wie Gott von den seinen ruhte."},
+    {"ref": "Matthäus 24,20", "text": "Betet darum, dass ihr nicht im Winter oder an einem Sabbat fliehen müsst."},
+    {"ref": "2. Mose 20,1-3", "text": "Da redete Gott alle diese Worte: Ich bin der HERR, dein Gott [...] Du sollst keine anderen Götter neben mir haben."},
+    {"ref": "Psalm 119,105", "text": "Dein Wort ist wie ein Licht in der Nacht, das meinen Weg erleuchtet."},
+    {"ref": "Prediger 12,13", "text": "Das Letzte vom Lied, nachdem nun alles gehört worden ist: Fürchte Gott und halte seine Gebote, denn das gilt für jeden Menschen."},
+    {"ref": "Matthäus 5,17-18", "text": "Denkt nicht, ich sei gekommen, um das Gesetz oder die Propheten abzuschaffen. Ich bin nicht gekommen, um sie abzuschaffen, sondern um sie zu erfüllen."},
+    {"ref": "Johannes 14,15", "text": "Wenn ihr mich liebt, werdet ihr meine Gebote befolgen."},
+    {"ref": "Johannes 15,10", "text": "Wenn ihr meine Gebote befolgt, werdet ihr in meiner Liebe bleiben, so wie ich die Gebote meines Vaters befolgt habe und in seiner Liebe bleibe."},
+    {"ref": "Römer 3,31", "text": "Setzen wir denn das Gesetz außer Kraft, wenn wir sagen, dass wir durch den Glauben gerettet werden? Ganz im Gegenteil! Wir bestätigen damit erst die Bedeutung des Gesetzes."},
+    {"ref": "Römer 7,12", "text": "Das Gesetz an sich ist also heilig, und das Gebot ist heilig, gerecht und gut."},
+    {"ref": "Jakobus 2,10", "text": "Denn wer das ganze Gesetz befolgt, sich aber auch nur in einem einzigen Punkt verfehlt, der ist an allem schuld."},
+    {"ref": "1. Johannes 5,3", "text": "Denn Gott lieben heißt seine Gebote befolgen. Und seine Gebote sind nicht schwer zu befolgen."},
+    {"ref": "Offenbarung 14,6", "text": "Und ich sah einen anderen Engel hoch am Himmel fliegen. Er hatte die ewige rettende Botschaft den Menschen auf der Erde zu verkünden – allen Nationen, Stämmen, Sprachen und Völkern."},
+    {"ref": "Offenbarung 14,7", "text": "Er rief mit lauter Stimme: Fürchtet Gott und gebt ihm die Ehre! Denn die Stunde ist gekommen, in der er Gericht halten wird. Betet den an, der den Himmel, die Erde, das Meer und alle Wasserquellen gemacht hat!"},
+    {"ref": "Offenbarung 14,8", "text": "Ein zweiter Engel folgte ihm, der rief: Gefallen, gefallen ist Babylon, die große Stadt, die allen Völkern den berauschenden Wein ihrer Unzucht zu trinken gab!"},
+    {"ref": "Offenbarung 14,9-10", "text": "Ein dritter Engel folgte ihnen und rief mit lauter Stimme: Wer das Tier und sein Standbild anbetet und das Zeichen auf seiner Stirn oder seiner Hand annimmt, der muss auch vom Wein des Zornes Gottes trinken."},
+    {"ref": "Offenbarung 14,12", "text": "Hier müssen die Gläubigen standhaft bleiben, die nach den Geboten Gottes leben und dem Glauben an Jesus treu bleiben."},
+    {"ref": "Offenbarung 12,17", "text": "Da wurde der Drache wütend über die Frau und zog in den Krieg gegen ihre übrigen Nachkommen – gegen alle, die Gottes Gebote befolgen und an dem festhalten, was Jesus bezeugt hat."},
+    {"ref": "Offenbarung 18,4", "text": "Dann hörte ich eine andere Stimme aus dem Himmel rufen: Geht aus ihr heraus, mein Volk, damit ihr nicht mitschuldig werdet an ihren Sünden und von ihren Plagen getroffen werdet!"},
+    {"ref": "Offenbarung 7,2-3", "text": "Und ich sah einen anderen Engel [...] Der rief laut: Schadet der Erde, dem Meer und den Bäumen nicht, bis wir den Knechten unseres Gottes das Siegel auf die Stirn gedrückt haben!"},
+    {"ref": "Offenbarung 22,14", "text": "Glücklich sind alle, die ihre Kleider waschen, damit sie das Recht haben, vom Baum des Lebens zu essen und durch die Tore in die Stadt einzutreten."},
+    {"ref": "Amos 3,7", "text": "Nichts tut Gott, der HERR, ohne seinen Entschluss vorher seinen Dienern, den Propheten, zu offenbaren."},
+    {"ref": "2. Mose 25,8", "text": "Die Israeliten sollen mir ein Heiligtum bauen, damit ich mitten unter ihnen wohnen kann."},
+    {"ref": "Psalm 77,14", "text": "Gott, dein Weg ist heilig! Wo ist ein Gott, der so groß ist wie unser Gott?"},
+    {"ref": "Daniel 7,9-10", "text": "Ich sah zu, wie Throne aufgestellt wurden. Und der Uralte nahm seinen Platz ein [...] Das Gericht trat zusammen und die Bücher wurden aufgeschlagen."},
+    {"ref": "Daniel 7,25", "text": "Er wird freche Reden gegen den Höchsten führen und das Volk des Allerhöchsten unterdrücken. Er wird versuchen, die Festzeiten und die Gesetze zu ändern."},
+    {"ref": "Daniel 8,14", "text": "Er antwortete mir: Es wird 2300 Abende und Morgen dauern. Dann wird das Heiligtum wieder seiner Bestimmung übergeben werden."},
+    {"ref": "Daniel 9,24", "text": "Siebzig mal sieben Jahre sind über dein Volk und deine heilige Stadt verhängt. Dann wird dem Ungehorsam ein Ende gemacht, die Sünde abgetan und die Schuld gesühnt sein."},
+    {"ref": "Hebräer 8,1-2", "text": "Das ist der Hauptpunkt: Wir haben einen solchen Hohen Priester, der seinen Platz zur Rechten des Thrones der himmlischen Majestät eingenommen hat. Dort dient er im Heiligtum, dem wahren Zelt der Begegnung, das der Herr selbst aufgeschlagen hat und kein Mensch."},
+    {"ref": "Hebräer 9,11-12", "text": "Doch als Christus als Hoher Priester kam [...] ging er ein für alle Mal in das Allerheiligste hinein – nicht mit dem Blut von Böcken und Kälbern, sondern mit seinem eigenen Blut – und hat so eine ewige Erlösung für uns erwirkt."},
+    {"ref": "Hebräer 4,16", "text": "Lasst uns deshalb voller Zuversicht vor den Thron unseres gnädigen Gottes treten. Dort werden wir Barmherzigkeit empfangen und Gnade finden, die uns hilft, wenn wir sie brauchen."},
+    {"ref": "2. Korinther 5,10", "text": "Denn wir alle müssen einmal vor dem Richterstuhl von Christus erscheinen, wo alles offenbar wird. Dann wird jeder das empfangen, was er für das Gute oder Böse verdient hat, das er zu Lebzeiten getan hat."},
+    {"ref": "1. Mose 2,7", "text": "Da formte Gott, der HERR, den Menschen aus dem Staub des Erdbodens und blies den Lebensatem in seine Nase. So wurde der Mensch ein lebendiges Wesen."},
+    {"ref": "Psalm 146,4", "text": "Wenn ihr Atem schwindet, kehren sie zur Erde zurück; an diesem Tag ist es aus mit all ihren Plänen."},
+    {"ref": "Prediger 9,5-6", "text": "Denn die Lebenden wissen wenigstens, dass sie sterben müssen, die Toten aber wissen gar nichts mehr [...] Ihre Liebe, ihr Hass und ihre Eifersucht sind längst erloschen."},
+    {"ref": "Prediger 9,10", "text": "Was immer du tun kannst, das tu nach besten Kräften. Denn im Totenreich, wohin du gehst, gibt es kein Handeln mehr und kein Planen, keine Erkenntnis und keine Weisheit."},
+    {"ref": "Hiob 19,25-26", "text": "Doch ich weiß, dass mein Erlöser lebt und dass er am Ende über dem Staub stehen wird. Und wenn meine Haut auch noch so zerschunden ist, werde ich in meinem Fleisch Gott sehen."},
+    {"ref": "Johannes 11,11-14", "text": "Nachdem er das gesagt hatte, fuhr er fort: Unser Freund Lazarus schläft, aber ich gehe hin, um ihn aufzuwecken [...] Da sagte ihnen Jesus frei heraus: Lazarus ist tot."},
+    {"ref": "Johannes 5,28-29", "text": "Wundert euch nicht darüber! Denn die Stunde kommt, in der alle Toten in den Gräbern die Stimme des Sohnes hören werden, und sie werden herauskommen. Diejenigen, die Gutes getan haben, werden zum Leben auferstehen, die aber, die Böses getan haben, zum Gericht."},
+    {"ref": "1. Thessalonicher 4,13", "text": "Wir möchten euch aber nicht im Ungewissen darüber lassen, liebe Geschwister, was mit denen geschieht, die schon gestorben sind, damit ihr nicht trauert wie die Menschen, die keine Hoffnung haben."},
+    {"ref": "1. Korinther 15,51-52", "text": "Ich will euch ein Geheimnis anvertrauen: Wir werden nicht alle sterben, aber wir werden alle verwandelt werden – in einem einzigen Augenblick, so schnell wie ein Wimpernschlag, wenn die letzte Posaune ertönt."},
+    {"ref": "1. Timotheus 6,15-16", "text": "Er ist der König aller Könige und Herr aller Herren. Er allein ist unsterblich und lebt in einem Licht, dem niemand sich nähern kann."},
+    {"ref": "Johannes 14,1-3", "text": "Lasst euch nicht entmutigen! Vertraut auf Gott und vertraut auf mich! [...] Ich gehe dorthin, um einen Platz für euch vorzubereiten. Wenn alles bereit ist, werde ich zurückkommen und euch zu mir holen, damit ihr dort seid, wo ich bin."},
+    {"ref": "Apostelgeschichte 1,11", "text": "Ihr Männer aus Galiläa, warum steht ihr da und starrt zum Himmel? Dieser Jesus, der von euch fort in den Himmel aufgenommen wurde, wird auf dieselbe Weise wiederkommen, wie ihr ihn habt gehen sehen!"},
+    {"ref": "Matthäus 24,27", "text": "Denn wie der Blitz vom Osten aufzuckt und bis zum Westen leuchtet, so wird die Ankunft des Menschensohnes sein."},
+    {"ref": "Matthäus 24,30", "text": "Und dann wird das Zeichen des Menschensohnes am Himmel erscheinen [...] Sie werden den Menschensohn mit großer Macht und Herrlichkeit auf den Wolken des Himmels kommen sehen."},
+    {"ref": "1. Thessalonicher 4,16-17", "text": "Denn der Herr selbst wird vom Himmel herabkommen. Ein lauter Befehl wird ertönen, die Stimme des Erzengels und die Posaune Gottes werden erschallen. Dann werden zuerst die auferstehen, die an Christus geglaubt haben und gestorben sind. Danach werden wir, die wir dann noch am Leben sind, zusammen mit ihnen auf Wolken emporgehoben werden."},
+    {"ref": "Titus 2,13", "text": "Während wir auf die Erfüllung unserer glückseligen Hoffnung warten: auf das Erscheinen der Herrlichkeit unseres großen Gottes und Retters Jesus Christus."},
+    {"ref": "Hebräer 9,28", "text": "Genauso wurde auch Christus nur einmal geopfert, um die Sünden vieler Menschen wegzunehmen. Er wird noch einmal wiederkommen – diesmal nicht wegen der Sünde, sondern um denen die Rettung zu bringen, die auf ihn warten."},
+    {"ref": "Offenbarung 1,7", "text": "Seht, er kommt mit den Wolken des Himmels! Alle werden ihn sehen, auch die, die ihn durchbohrt haben. Und alle Völker der Erde werden seinetwegen klagen."},
+    {"ref": "Offenbarung 21,3-4", "text": "Er wird alle ihre Tränen abwischen, und es wird keinen Tod und keine Trauer und kein Weinen und keinen Schmerz mehr geben. Denn die erste Welt mit ihrem ganzen Leid ist für immer vergangen."},
+    {"ref": "Offenbarung 22,20", "text": "Er, der all das bezeugt, spricht: Ja, ich komme bald! Amen! Komm, Herr Jesus!"},
+    {"ref": "1. Korinther 3,16-17", "text": "Begreift ihr denn nicht, dass ihr alle zusammen der Tempel Gottes seid und dass der Geist Gottes in eurer Mitte wohnt? Wenn jemand den Tempel Gottes zerstört, wird Gott ihn zerstören. Denn Gottes Tempel ist heilig, und dieser Tempel seid ihr."},
+    {"ref": "1. Korinther 6,19-20", "text": "Habt ihr denn vergessen, dass euer Körper ein Tempel des Heiligen Geistes ist, der in euch wohnt und den Gott euch gegeben hat? Ihr gehört nicht euch selbst, denn Gott hat einen hohen Preis für euch bezahlt. Deshalb ehrt Gott mit eurem Körper!"},
+    {"ref": "1. Korinther 10,31", "text": "Ob ihr nun esst oder trinkt oder sonst etwas tut: Tut alles zur Ehre Gottes."},
+    {"ref": "Römer 12,1-2", "text": "Deshalb ermahne ich euch, liebe Geschwister [...] stellt euer ganzes Leben Gott zur Verfügung! Bringt euch selbst als lebendiges und heiliges Opfer dar, das Gott gefällt. Das ist die wahre Art, Gott anzubeten."},
+    {"ref": "3. Johannes 1,2", "text": "Mein lieber Freund, ich wünsche dir von Herzen, dass es dir in jeder Hinsicht gut geht und du gesund bist – so wie es auch deiner Seele gut geht."},
+    {"ref": "1. Mose 1,29", "text": "Und Gott sprach: Seht, ich übergebe euch alle samentragenden Pflanzen auf der ganzen Erde und alle Bäume mit samentragenden Früchten. Sie sollen euch als Nahrung dienen."},
+    {"ref": "3. Mose 11,46-47", "text": "Das sind die Bestimmungen über Landtiere, Vögel und alle Lebewesen [...] Ihr sollt klar unterscheiden zwischen dem, was rein ist und was unrein, zwischen den Tieren, die gegessen werden dürfen, und denen, die ihr nicht essen dürft."},
+    {"ref": "Sprüche 20,1", "text": "Wein macht zum Spötter und Bier zum Raufbold; wer sich berauscht, wird niemals weise."},
+    {"ref": "Maleachi 3,10", "text": "Bringt den zehnten Teil eurer Erträge vollständig in mein Vorratshaus [...] Stellt mich doch damit auf die Probe, spricht der allmächtige HERR! Ihr werdet schon sehen, wie ich die Schleusen des Himmels öffne und euch mit Segen überschütte!"},
+    {"ref": "Philipper 4,8", "text": "Schließlich, meine Geschwister: Richtet eure Gedanken auf das, was wahrhaftig, edel und gerecht ist, was rein, liebenswert und ansprechend ist, auf alles, was Tugend heißt und Lob verdient!"},
+    {"ref": "2. Timotheus 3,16-17", "text": "Die ganze Schrift ist von Gott eingegeben. Sie zeigt uns die Wahrheit, deckt Schuld auf, korrigiert Fehler und erzieht uns zu einem Leben, wie es Gott gefällt."},
+    {"ref": "2. Petrus 1,19", "text": "Damit ist das prophetische Wort für uns noch fester geworden. Ihr tut gut daran, eure ganze Aufmerksamkeit darauf zu richten wie auf ein Licht, das an einem dunklen Ort brennt."},
+    {"ref": "2. Petrus 1,20-21", "text": "Vor allem müsst ihr bedenken, dass keine Weissagung in der Schrift eine Angelegenheit eigener Auslegung ist. Denn niemals wurde eine Weissagung durch menschlichen Willen hervorgebracht, sondern Menschen wurden vom Heiligen Geist getrieben und redeten im Auftrag Gottes."},
+    {"ref": "Offenbarung 19,10", "text": "Denn die Botschaft von Jesus ist der Geist, der die Propheten inspiriert."},
+    {"ref": "Jesaja 8,20", "text": "Haltet euch an Gottes Gesetz und seine Weisungen! Wer nicht mit ihnen übereinstimmt, für den gibt es keine Zukunft."},
+    {"ref": "1. Thessalonicher 5,19-21", "text": "Hindert den Geist nicht daran zu wirken! Verachtet prophetische Reden nicht! Prüft aber alles und behaltet das Gute!"},
+    {"ref": "Matthäus 7,15-16", "text": "Hütet euch vor den falschen Propheten! Sie kommen zu euch im Schafspelz, aber in Wirklichkeit sind sie reißende Wölfe. An ihren Früchten werdet ihr sie erkennen."},
+    {"ref": "Joel 3,1-2", "text": "Danach werde ich meinen Geist über alle Menschen ausgießen. Eure Söhne und Töchter werden weissagen, eure alten Männer werden Träume haben und eure jungen Männer Visionen."},
+    {"ref": "Lukas 24,27", "text": "Und er begann bei Mose und allen Propheten und erklärte ihnen alles, was in den Schriften über ihn gesagt worden war."},
+    {"ref": "Johannes 5,39", "text": "Ihr studiert die Heilige Schrift, weil ihr meint, darin das ewige Leben zu finden. Und gerade sie weist auf mich hin!"},
+    {"ref": "Johannes 3,16", "text": "Denn Gott hat die Menschen so sehr geliebt, dass er seinen einzigen Sohn für sie hergab. Jeder, der an ihn glaubt, wird nicht zugrunde gehen, sondern das ewige Leben haben."},
+    {"ref": "Epheser 2,8-9", "text": "Denn nur durch seine unverdiente Gnade seid ihr gerettet, und zwar aufgrund des Glaubens. Ihr habt das nicht selbst zustande gebracht; es ist Gottes Geschenk. Es ist nicht das Ergebnis eigener Taten, damit niemand darauf stolz sein kann."},
+    {"ref": "Römer 5,1", "text": "Da wir nun durch den Glauben vor Gott gerecht gesprochen worden sind, haben wir Frieden mit Gott durch unseren Herrn Jesus Christus."},
+    {"ref": "Römer 8,1", "text": "Wer nun mit Jesus Christus verbunden ist, wird von Gott nicht mehr verurteilt."},
+    {"ref": "2. Korinther 5,17", "text": "Wer mit Christus verbunden ist, der ist eine neue Schöpfung. Das Alte ist vergangen, etwas ganz Neues hat begonnen!"},
+    {"ref": "Galater 2,20", "text": "Mein altes Leben ist mit Christus am Kreuz gestorben. Deshalb lebe nicht mehr ich, sondern Christus lebt in mir."},
+    {"ref": "1. Johannes 1,9", "text": "Wenn wir aber unsere Sünden bekennen, ist er treu und gerecht: Er vergibt uns die Sünden und reinigt uns von allem Unrecht."},
+    {"ref": "1. Petrus 2,9", "text": "Ihr aber seid ein auserwähltes Volk, königliche Priester, eine heilige Nation, Gottes eigenes Volk. Ihr sollt verkünden, wie wunderbar er ist, der euch aus der Dunkelheit in sein herrliches Licht gerufen hat."},
+    {"ref": "Hebräer 11,1", "text": "Was ist Glaube? Er ist ein Festhalten an dem, worauf man hofft, und ein Überzeugtsein von Tatsachen, die man nicht sehen kann."},
+    {"ref": "Hebräer 12,2", "text": "Lasst uns dabei den Blick auf Jesus gerichtet halten, von dem unser Glaube vom Anfang bis zum Ende abhängt."},
+    {"ref": "Matthäus 28,19-20", "text": "Geht nun hin zu allen Völkern und macht die Menschen zu meinen Jüngern. Tauft sie auf den Namen des Vaters, des Sohnes und des Heiligen Geistes, und lehrt sie, alles zu befolgen, was ich euch aufgetragen habe."},
+    {"ref": "Markus 16,16", "text": "Wer glaubt und getauft wird, der wird gerettet werden; wer aber nicht glaubt, der wird verurteilt werden."},
+    {"ref": "Psalm 23,1-3", "text": "Der HERR ist mein Hirte, mir wird nichts fehlen. Er lässt mich auf grünen Wiesen rasten, er führt mich an ruhige Wasser. Er gibt mir neue Kraft."},
+    {"ref": "Psalm 46,2-3", "text": "Gott ist unsere Zuflucht und unsere Stärke; er hat sich in Notzeiten immer als Retter erwiesen."},
+    {"ref": "Sprüche 3,5-6", "text": "Verlass dich von ganzem Herzen auf den HERRN und verlass dich nicht auf deinen eigenen Verstand. Denke an ihn bei allem, was du tust; er wird dir den richtigen Weg zeigen."},
+    {"ref": "Jesaja 40,31", "text": "Doch die, die auf den HERRN hoffen, bekommen neue Kraft. Sie schwingen sich auf mit Flügeln wie Adler. Sie laufen und werden nicht müde, sie gehen und werden nicht matt."},
+    {"ref": "Jesaja 41,10", "text": "Fürchte dich nicht, denn ich bin bei dir. Schau dich nicht ängstlich um, denn ich bin dein Gott. Ich mache dich stark, ich helfe dir, ich halte dich fest mit meiner siegreichen Hand."},
+    {"ref": "Jeremia 29,11", "text": "Denn ich weiß genau, welche Pläne ich für euch habe, spricht der HERR. Mein Plan ist, euch Heil zu geben und kein Unheil, euch eine Zukunft und eine Hoffnung zu schenken."},
+    {"ref": "Philipper 4,6-7", "text": "Macht euch um nichts Sorgen! Wendet euch vielmehr in jeder Lage mit Bitten und Flehen und voll Dankbarkeit an Gott und bringt eure Anliegen vor ihn. Dann wird der Friede Gottes, der weit über allen menschlichen Verstand hinausreicht, eure Herzen und eure Gedanken in Christus Jesus bewahren."},
+    {"ref": "Philipper 4,13", "text": "Ich kann alles durch den tun, der mir Kraft gibt."}
+  ];
+
   const DEFAULT_INTERVALS = [1, 7, 30, 180, 365];
   
   let intervals = JSON.parse(localStorage.getItem('bible_intervals')) || [...DEFAULT_INTERVALS];
-  let verses = JSON.parse(localStorage.getItem('bible_verses')) || [];
+  
+  // Prüfen: Gibt es schon Verse im Speicher? Wenn nein -> lade automatisch die 100 Verse!
+  let savedVerses = localStorage.getItem('bible_verses');
+  let verses = [];
+  
+  if (!savedVerses) {
+    verses = DEFAULT_VERSES_DATA.map((item, index) => ({
+      id: Date.now() + index,
+      ref: item.ref,
+      text: item.text,
+      box: 0,
+      nextDue: Date.now()
+    }));
+    localStorage.setItem('bible_verses', JSON.stringify(verses));
+  } else {
+    verses = JSON.parse(savedVerses);
+  }
 
   let currentVerse = null;
 
@@ -272,7 +391,7 @@
     if (due.length === 0) {
       refEl.innerText = "Alles erledigt! 🎉";
       textEl.innerText = "";
-      metaEl.innerText = verses.length === 0 ? "Füge Verse über das Formular oder den Import hinzu." : "Komm morgen wieder für die nächste Runde.";
+      metaEl.innerText = verses.length === 0 ? "Füge Verse über das Formular hinzu." : "Komm morgen wieder für die nächste Runde.";
       btnReveal.classList.add('hidden');
       currentVerse = null;
       renderList();
@@ -402,7 +521,6 @@
     renderCard();
   });
 
-  // Import-Logik
   document.getElementById('btn-import').addEventListener('click', () => {
     const rawData = document.getElementById('import-json').value.trim();
     if (!rawData) {
@@ -413,7 +531,7 @@
     try {
       const parsed = JSON.parse(rawData);
       if (!Array.isArray(parsed)) {
-        alert("Fehler: Die Daten müssen eine Liste von Versen sein (eckige Klammern [ ] außen).");
+        alert("Fehler: Die Daten müssen eine Liste sein ([ ]).");
         return;
       }
 
@@ -433,14 +551,13 @@
 
       saveVerses();
       document.getElementById('import-json').value = '';
-      alert(`Erfolg: Es wurden ${count} Verse erfolgreich importiert!`);
+      alert(`Erfolg: Es wurden ${count} Verse importiert!`);
       renderCard();
     } catch (e) {
-      alert("Ungültiges JSON-Format. Bitte prüfe den kopierten Text.");
+      alert("Ungültiges Format. Bitte prüfe den Text.");
     }
   });
 
-  // Export-Logik
   document.getElementById('btn-export').addEventListener('click', () => {
     if (verses.length === 0) {
       alert("Keine Verse zum Exportieren vorhanden!");
@@ -453,7 +570,7 @@
       alert("Verse wurden als JSON in deine Zwischenablage kopiert!");
     }).catch(() => {
       document.getElementById('import-json').value = jsonStr;
-      alert("Backup wurde in das Textfeld geschrieben. Du kannst es dort markieren und kopieren.");
+      alert("Backup in das Textfeld geschrieben.");
     });
   });
 
