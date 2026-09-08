@@ -74,7 +74,7 @@
       font-size: 0.95rem;
     }
     
-    /* Intervalleinstellungen Styling */
+    /* Intervalleinstellungen */
     .setting-row {
       display: flex;
       align-items: center;
@@ -90,6 +90,51 @@
       padding: 4px 0;
       user-select: none;
     }
+
+    /* Vers-Listenansicht */
+    .verse-item {
+      border-bottom: 1px solid #edf2f7;
+      padding: 12px 0;
+    }
+    .verse-item:last-child { border-bottom: none; }
+    .verse-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .verse-item-title {
+      font-weight: bold;
+      color: var(--primary);
+      font-size: 1rem;
+    }
+    .stage-tag {
+      background: #edf2f7;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 8px;
+      color: #4a5568;
+    }
+    .verse-item-content {
+      font-size: 0.9rem;
+      color: #4a5568;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+    .verse-item-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      width: auto;
+      margin: 0;
+    }
+    .btn-edit { background: #e2e8f0; color: #2d3748; }
+    .btn-delete { background: #fed7d7; color: #9b2c2c; }
   </style>
 </head>
 <body>
@@ -122,6 +167,16 @@
     <input type="text" id="input-ref" placeholder="Bibelstelle (z.B. Psalm 23,1)" />
     <textarea id="input-text" rows="3" placeholder="Vers-Text hier eingeben..."></textarea>
     <button id="btn-add" class="btn btn-secondary">+ Speichern</button>
+  </section>
+
+  <!-- Übersicht aller Verse -->
+  <section class="box-panel">
+    <details id="details-list">
+      <summary>📋 Alle Verse verwalten (<span id="total-count">0</span>)</summary>
+      <div id="verse-list-container" style="margin-top: 14px;">
+        <!-- Dynamische Einträge -->
+      </div>
+    </details>
   </section>
 
   <!-- Einstellungen für Intervalle -->
@@ -162,13 +217,10 @@
 </div>
 
 <script>
-  // Standard-Intervalle in Tagen
   const DEFAULT_INTERVALS = [1, 7, 30, 180, 365];
   
-  // Gespeicherte Intervalle laden oder Standard setzen
   let intervals = JSON.parse(localStorage.getItem('bible_intervals')) || [...DEFAULT_INTERVALS];
 
-  // Verse aus dem Smartphone-Speicher laden oder Startbeispiel anlegen
   let verses = JSON.parse(localStorage.getItem('bible_verses')) || [
     {
       id: 1,
@@ -194,7 +246,6 @@
     return verses.filter(v => v.nextDue <= now);
   }
 
-  // Eingabefelder für Einstellungen mit aktuellen Werten füllen
   function updateIntervalInputs() {
     for (let i = 0; i < 5; i++) {
       const input = document.getElementById(`int-${i}`);
@@ -205,6 +256,7 @@
   function renderCard() {
     const due = getDueVerses();
     document.getElementById('due-count').innerText = `${due.length} Vers(e) heute fällig`;
+    document.getElementById('total-count').innerText = verses.length;
 
     const textEl = document.getElementById('card-text');
     const refEl = document.getElementById('card-ref');
@@ -221,6 +273,7 @@
       metaEl.innerText = "Komm morgen wieder oder trage neue Verse ein.";
       btnReveal.classList.add('hidden');
       currentVerse = null;
+      renderList();
       return;
     }
 
@@ -231,9 +284,75 @@
     const nextDays = intervals[Math.min(currentVerse.box, intervals.length - 1)];
     metaEl.innerText = `Aktuelle Stufe: ${currentVerse.box} → Nächstes Ziel: in ${nextDays} Tag(en)`;
     btnReveal.classList.remove('hidden');
+
+    renderList();
   }
 
-  // Text aufdecken
+  // Alle Verse in der Liste anzeigen
+  function renderList() {
+    const container = document.getElementById('verse-list-container');
+    if (!container) return;
+
+    if (verses.length === 0) {
+      container.innerHTML = '<p style="color: #a0aec0; font-size: 0.9rem;">Noch keine Verse gespeichert.</p>';
+      return;
+    }
+
+    container.innerHTML = verses.map(v => `
+      <div class="verse-item">
+        <div class="verse-item-header">
+          <span class="verse-item-title">${escapeHtml(v.ref)}</span>
+          <span class="stage-tag">Stufe ${v.box || 0}</span>
+        </div>
+        <div class="verse-item-content">${escapeHtml(v.text)}</div>
+        <div class="verse-item-actions">
+          <button class="btn btn-small btn-edit" onclick="editVerse(${v.id})">Bearbeiten</button>
+          <button class="btn btn-small btn-delete" onclick="deleteVerse(${v.id})">Löschen</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.innerText = text;
+    return div.innerHTML;
+  }
+
+  // Vers bearbeiten
+  window.editVerse = function(id) {
+    const v = verses.find(item => item.id === id);
+    if (!v) return;
+
+    const newRef = prompt("Bibelstelle bearbeiten:", v.ref);
+    if (newRef === null) return; // Abgebrochen
+
+    const newText = prompt("Vers-Text bearbeiten:", v.text);
+    if (newText === null) return; // Abgebrochen
+
+    if (newRef.trim() && newText.trim()) {
+      v.ref = newRef.trim();
+      v.text = newText.trim();
+      saveVerses();
+      renderCard();
+    } else {
+      alert("Bibelstelle und Text dürfen nicht leer sein!");
+    }
+  };
+
+  // Vers löschen
+  window.deleteVerse = function(id) {
+    const v = verses.find(item => item.id === id);
+    if (!v) return;
+
+    if (confirm(`Möchtest du "${v.ref}" wirklich löschen?`)) {
+      verses = verses.filter(item => item.id !== id);
+      saveVerses();
+      renderCard();
+    }
+  };
+
+  // Aufdecken
   document.getElementById('btn-reveal').addEventListener('click', () => {
     document.getElementById('card-text').classList.remove('hidden');
     document.getElementById('btn-reveal').classList.add('hidden');
@@ -248,7 +367,6 @@
     const nextBox = Math.min(currentBox + 1, intervals.length - 1);
 
     currentVerse.box = nextBox;
-    // Fälligkeit in die Zukunft verschieben
     currentVerse.nextDue = Date.now() + (daysToAdd * 24 * 60 * 60 * 1000);
 
     saveVerses();
@@ -258,8 +376,8 @@
   // Bewertung: Nochmal üben
   document.getElementById('btn-fail').addEventListener('click', () => {
     if (!currentVerse) return;
-    currentVerse.box = 0; // Zurück auf Anfang
-    currentVerse.nextDue = Date.now() + (10 * 60 * 1000); // nach 10 Minuten wiederholen
+    currentVerse.box = 0;
+    currentVerse.nextDue = Date.now() + (10 * 60 * 1000);
 
     saveVerses();
     renderCard();
@@ -316,7 +434,7 @@
     }
   });
 
-  // Initialisierung beim Laden
+  // Start initialisieren
   updateIntervalInputs();
   renderCard();
 </script>
