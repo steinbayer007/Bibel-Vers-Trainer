@@ -57,7 +57,7 @@
     
     .actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     
-    /* Eingabebereiche & Boxen */
+    /* Boxen & Eingabefelder */
     .box-panel {
       background: #fff;
       padding: 16px;
@@ -74,7 +74,6 @@
       font-size: 0.95rem;
     }
     
-    /* Intervalleinstellungen */
     .setting-row {
       display: flex;
       align-items: center;
@@ -91,7 +90,6 @@
       user-select: none;
     }
 
-    /* Vers-Listenansicht */
     .verse-item {
       border-bottom: 1px solid #edf2f7;
       padding: 12px 0;
@@ -161,7 +159,7 @@
     </div>
   </main>
 
-  <!-- Formular für neue Verse -->
+  <!-- Formular für einzelne Verse -->
   <section class="box-panel">
     <h3 style="margin-top: 0; font-size: 1.1rem;">Neuen Vers hinzufügen</h3>
     <input type="text" id="input-ref" placeholder="Bibelstelle (z.B. Psalm 23,1)" />
@@ -173,8 +171,21 @@
   <section class="box-panel">
     <details id="details-list">
       <summary>📋 Alle Verse verwalten (<span id="total-count">0</span>)</summary>
-      <div id="verse-list-container" style="margin-top: 14px;">
-        <!-- Dynamische Einträge -->
+      <div id="verse-list-container" style="margin-top: 14px;"></div>
+    </details>
+  </section>
+
+  <!-- Import & Export / Datensicherung -->
+  <section class="box-panel">
+    <details>
+      <summary>💾 Datensicherung & Import (JSON)</summary>
+      <div style="margin-top: 14px;">
+        <p style="font-size: 0.85rem; color: #718096; margin-top: 0;">
+          Füge hier ein Vers-Paket (JSON-Code) ein, um viele Verse auf einmal hinzuzufügen:
+        </p>
+        <textarea id="import-json" rows="4" placeholder='[{"ref":"Psalm 23,1","text":"..."}, ...]'></textarea>
+        <button id="btn-import" class="btn btn-show">Verse importieren</button>
+        <button id="btn-export" class="btn btn-secondary" style="margin-top: 10px;">Verse als Backup kopieren</button>
       </div>
     </details>
   </section>
@@ -220,16 +231,7 @@
   const DEFAULT_INTERVALS = [1, 7, 30, 180, 365];
   
   let intervals = JSON.parse(localStorage.getItem('bible_intervals')) || [...DEFAULT_INTERVALS];
-
-  let verses = JSON.parse(localStorage.getItem('bible_verses')) || [
-    {
-      id: 1,
-      ref: "Johannes 3,16",
-      text: "Denn also hat Gott die Welt geliebt, dass er seinen eingeborenen Sohn gab, damit alle, die an ihn glauben, nicht verloren werden, sondern das ewige Leben haben.",
-      box: 0,
-      nextDue: Date.now()
-    }
-  ];
+  let verses = JSON.parse(localStorage.getItem('bible_verses')) || [];
 
   let currentVerse = null;
 
@@ -270,7 +272,7 @@
     if (due.length === 0) {
       refEl.innerText = "Alles erledigt! 🎉";
       textEl.innerText = "";
-      metaEl.innerText = "Komm morgen wieder oder trage neue Verse ein.";
+      metaEl.innerText = verses.length === 0 ? "Füge Verse über das Formular oder den Import hinzu." : "Komm morgen wieder für die nächste Runde.";
       btnReveal.classList.add('hidden');
       currentVerse = null;
       renderList();
@@ -288,7 +290,6 @@
     renderList();
   }
 
-  // Alle Verse in der Liste anzeigen
   function renderList() {
     const container = document.getElementById('verse-list-container');
     if (!container) return;
@@ -319,16 +320,15 @@
     return div.innerHTML;
   }
 
-  // Vers bearbeiten
   window.editVerse = function(id) {
     const v = verses.find(item => item.id === id);
     if (!v) return;
 
     const newRef = prompt("Bibelstelle bearbeiten:", v.ref);
-    if (newRef === null) return; // Abgebrochen
+    if (newRef === null) return;
 
     const newText = prompt("Vers-Text bearbeiten:", v.text);
-    if (newText === null) return; // Abgebrochen
+    if (newText === null) return;
 
     if (newRef.trim() && newText.trim()) {
       v.ref = newRef.trim();
@@ -340,7 +340,6 @@
     }
   };
 
-  // Vers löschen
   window.deleteVerse = function(id) {
     const v = verses.find(item => item.id === id);
     if (!v) return;
@@ -352,14 +351,12 @@
     }
   };
 
-  // Aufdecken
   document.getElementById('btn-reveal').addEventListener('click', () => {
     document.getElementById('card-text').classList.remove('hidden');
     document.getElementById('btn-reveal').classList.add('hidden');
     document.getElementById('rating-buttons').classList.remove('hidden');
   });
 
-  // Bewertung: Gewusst
   document.getElementById('btn-success').addEventListener('click', () => {
     if (!currentVerse) return;
     const currentBox = currentVerse.box || 0;
@@ -373,7 +370,6 @@
     renderCard();
   });
 
-  // Bewertung: Nochmal üben
   document.getElementById('btn-fail').addEventListener('click', () => {
     if (!currentVerse) return;
     currentVerse.box = 0;
@@ -383,7 +379,6 @@
     renderCard();
   });
 
-  // Neuen Vers eintragen
   document.getElementById('btn-add').addEventListener('click', () => {
     const ref = document.getElementById('input-ref').value.trim();
     const text = document.getElementById('input-text').value.trim();
@@ -407,13 +402,67 @@
     renderCard();
   });
 
-  // Einstellungen speichern
+  // Import-Logik
+  document.getElementById('btn-import').addEventListener('click', () => {
+    const rawData = document.getElementById('import-json').value.trim();
+    if (!rawData) {
+      alert("Bitte füge zuerst den JSON-Text ein!");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(rawData);
+      if (!Array.isArray(parsed)) {
+        alert("Fehler: Die Daten müssen eine Liste von Versen sein (eckige Klammern [ ] außen).");
+        return;
+      }
+
+      let count = 0;
+      parsed.forEach((item, index) => {
+        if (item.ref && item.text) {
+          verses.push({
+            id: Date.now() + index,
+            ref: item.ref.trim(),
+            text: item.text.trim(),
+            box: 0,
+            nextDue: Date.now()
+          });
+          count++;
+        }
+      });
+
+      saveVerses();
+      document.getElementById('import-json').value = '';
+      alert(`Erfolg: Es wurden ${count} Verse erfolgreich importiert!`);
+      renderCard();
+    } catch (e) {
+      alert("Ungültiges JSON-Format. Bitte prüfe den kopierten Text.");
+    }
+  });
+
+  // Export-Logik
+  document.getElementById('btn-export').addEventListener('click', () => {
+    if (verses.length === 0) {
+      alert("Keine Verse zum Exportieren vorhanden!");
+      return;
+    }
+    const cleanList = verses.map(v => ({ ref: v.ref, text: v.text }));
+    const jsonStr = JSON.stringify(cleanList, null, 2);
+    
+    navigator.clipboard.writeText(jsonStr).then(() => {
+      alert("Verse wurden als JSON in deine Zwischenablage kopiert!");
+    }).catch(() => {
+      document.getElementById('import-json').value = jsonStr;
+      alert("Backup wurde in das Textfeld geschrieben. Du kannst es dort markieren und kopieren.");
+    });
+  });
+
   document.getElementById('btn-save-settings').addEventListener('click', () => {
     const newIntervals = [];
     for (let i = 0; i < 5; i++) {
       const val = parseInt(document.getElementById(`int-${i}`).value, 10);
       if (isNaN(val) || val < 1) {
-        alert(`Bitte für Stufe ${i} eine gültige Tagesanzahl (mind. 1) eintragen!`);
+        alert(`Bitte für Stufe ${i} eine gültige Tagesanzahl eintragen!`);
         return;
       }
       newIntervals.push(val);
@@ -424,9 +473,8 @@
     renderCard();
   });
 
-  // Einstellungen zurücksetzen
   document.getElementById('btn-reset-settings').addEventListener('click', () => {
-    if (confirm("Möchtest du wirklich alle Intervalle auf die Standardwerte zurücksetzen?")) {
+    if (confirm("Möchtest du die Intervalle auf Standard zurücksetzen?")) {
       intervals = [...DEFAULT_INTERVALS];
       saveIntervals();
       updateIntervalInputs();
@@ -434,7 +482,6 @@
     }
   });
 
-  // Start initialisieren
   updateIntervalInputs();
   renderCard();
 </script>
