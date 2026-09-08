@@ -16,7 +16,7 @@
     }
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
     body { background: var(--bg); color: var(--text); margin: 0; padding: 16px; display: flex; justify-content: center; }
-    .container { width: 100%; max-width: 480px; }
+    .container { width: 100%; max-width: 480px; padding-bottom: 40px; }
     
     header { text-align: center; margin-bottom: 20px; }
     h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
@@ -36,7 +36,7 @@
     }
     .reference { font-size: 1.3rem; font-weight: bold; margin-bottom: 12px; color: var(--primary); }
     .verse-text { font-size: 1.1rem; line-height: 1.5; color: #4a5568; }
-    .hidden { display: none; }
+    .hidden { display: none !important; }
     
     .btn {
       border: none;
@@ -53,16 +53,17 @@
     .btn-show { background: var(--primary); color: #fff; }
     .btn-good { background: var(--accent); color: #fff; }
     .btn-repeat { background: var(--warn); color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: #2d3748; }
     
     .actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     
-    /* Eingabebereich */
-    .form-box {
+    /* Eingabebereiche & Boxen */
+    .box-panel {
       background: #fff;
       padding: 16px;
       border-radius: 12px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-      margin-top: 24px;
+      margin-top: 20px;
     }
     input, textarea {
       width: 100%;
@@ -72,7 +73,23 @@
       margin-bottom: 10px;
       font-size: 0.95rem;
     }
-    .btn-secondary { background: #e2e8f0; color: #2d3748; }
+    
+    /* Intervalleinstellungen Styling */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .setting-row label { font-size: 0.9rem; flex: 1; }
+    .setting-row input { width: 85px; margin-bottom: 0; text-align: center; }
+    details summary {
+      cursor: pointer;
+      font-weight: bold;
+      color: var(--primary);
+      padding: 4px 0;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -88,7 +105,7 @@
     <div class="card">
       <div id="card-ref" class="reference">Keine Verse fällig! 🎉</div>
       <div id="card-text" class="verse-text hidden"></div>
-      <div id="card-meta" style="margin-top: 15px; font-size: 0.8rem; color: #a0aec0;"></div>
+      <div id="card-meta" style="margin-top: 15px; font-size: 0.85rem; color: #718096;"></div>
     </div>
 
     <button id="btn-reveal" class="btn btn-show">Text aufdecken</button>
@@ -100,26 +117,65 @@
   </main>
 
   <!-- Formular für neue Verse -->
-  <section class="form-box">
-    <h3 style="margin-top: 0;">Neuen Vers hinzufügen</h3>
+  <section class="box-panel">
+    <h3 style="margin-top: 0; font-size: 1.1rem;">Neuen Vers hinzufügen</h3>
     <input type="text" id="input-ref" placeholder="Bibelstelle (z.B. Psalm 23,1)" />
     <textarea id="input-text" rows="3" placeholder="Vers-Text hier eingeben..."></textarea>
     <button id="btn-add" class="btn btn-secondary">+ Speichern</button>
   </section>
+
+  <!-- Einstellungen für Intervalle -->
+  <section class="box-panel">
+    <details>
+      <summary>⚙️ Lern-Intervalle anpassen</summary>
+      <div style="margin-top: 14px;">
+        <p style="font-size: 0.85rem; color: #718096; margin-top: 0;">
+          Gib an, nach wie vielen <b>Tagen</b> ein Vers bei Erfolg in der nächsten Stufe wieder vorgelegt werden soll:
+        </p>
+        
+        <div class="setting-row">
+          <label for="int-0">Stufe 0 (Neu / Wiederholen):</label>
+          <input type="number" id="int-0" min="1" /> Tage
+        </div>
+        <div class="setting-row">
+          <label for="int-1">Stufe 1 (Gelernt):</label>
+          <input type="number" id="int-1" min="1" /> Tage
+        </div>
+        <div class="setting-row">
+          <label for="int-2">Stufe 2 (Gefestigt):</label>
+          <input type="number" id="int-2" min="1" /> Tage
+        </div>
+        <div class="setting-row">
+          <label for="int-3">Stufe 3 (Langzeit):</label>
+          <input type="number" id="int-3" min="1" /> Tage
+        </div>
+        <div class="setting-row">
+          <label for="int-4">Stufe 4 (Gemeistert):</label>
+          <input type="number" id="int-4" min="1" /> Tage
+        </div>
+
+        <button id="btn-save-settings" class="btn btn-show" style="margin-top: 12px;">Intervalle speichern</button>
+        <button id="btn-reset-settings" class="btn btn-secondary" style="margin-top: 6px; font-size: 0.85rem;">Auf Standard zurücksetzen</button>
+      </div>
+    </details>
+  </section>
 </div>
 
 <script>
-  // Intervalle in Tagen: Stufe 0 = sofort, 1 = 7 Tage, 2 = 30 Tage, 3 = 180 Tage, 4 = 365 Tage
-  const INTERVALS = [1, 7, 30, 180, 365];
+  // Standard-Intervalle in Tagen
+  const DEFAULT_INTERVALS = [1, 7, 30, 180, 365];
+  
+  // Gespeicherte Intervalle laden oder Standard setzen
+  let intervals = JSON.parse(localStorage.getItem('bible_intervals')) || [...DEFAULT_INTERVALS];
 
-  // Verse aus dem Handy-Speicher laden oder Beispieldaten setzen
+  // Verse aus dem Smartphone-Speicher laden oder Startbeispiel anlegen
   let verses = JSON.parse(localStorage.getItem('bible_verses')) || [
     {
       id: 1,
       ref: "Johannes 3,16",
       text: "Denn also hat Gott die Welt geliebt, dass er seinen eingeborenen Sohn gab, damit alle, die an ihn glauben, nicht verloren werden, sondern das ewige Leben haben.",
       box: 0,
-      nextDue: Date.now() // sofort fällig
+      nextDue: Date.now()
     }
   ];
 
@@ -129,9 +185,21 @@
     localStorage.setItem('bible_verses', JSON.stringify(verses));
   }
 
+  function saveIntervals() {
+    localStorage.setItem('bible_intervals', JSON.stringify(intervals));
+  }
+
   function getDueVerses() {
     const now = Date.now();
     return verses.filter(v => v.nextDue <= now);
+  }
+
+  // Eingabefelder für Einstellungen mit aktuellen Werten füllen
+  function updateIntervalInputs() {
+    for (let i = 0; i < 5; i++) {
+      const input = document.getElementById(`int-${i}`);
+      if (input) input.value = intervals[i];
+    }
   }
 
   function renderCard() {
@@ -159,11 +227,13 @@
     currentVerse = due[0];
     refEl.innerText = currentVerse.ref;
     textEl.innerText = currentVerse.text;
-    metaEl.innerText = `Lernstufe: ${currentVerse.box} (Nächstes Ziel: ${INTERVALS[Math.min(currentVerse.box, INTERVALS.length - 1)]} Tage)`;
+    
+    const nextDays = intervals[Math.min(currentVerse.box, intervals.length - 1)];
+    metaEl.innerText = `Aktuelle Stufe: ${currentVerse.box} → Nächstes Ziel: in ${nextDays} Tag(en)`;
     btnReveal.classList.remove('hidden');
   }
 
-  // Aufdecken
+  // Text aufdecken
   document.getElementById('btn-reveal').addEventListener('click', () => {
     document.getElementById('card-text').classList.remove('hidden');
     document.getElementById('btn-reveal').classList.add('hidden');
@@ -174,33 +244,34 @@
   document.getElementById('btn-success').addEventListener('click', () => {
     if (!currentVerse) return;
     const currentBox = currentVerse.box || 0;
-    const nextBox = Math.min(currentBox + 1, INTERVALS.length - 1);
-    const daysToAdd = INTERVALS[currentBox];
+    const daysToAdd = intervals[Math.min(currentBox, intervals.length - 1)];
+    const nextBox = Math.min(currentBox + 1, intervals.length - 1);
 
     currentVerse.box = nextBox;
+    // Fälligkeit in die Zukunft verschieben
     currentVerse.nextDue = Date.now() + (daysToAdd * 24 * 60 * 60 * 1000);
 
     saveVerses();
     renderCard();
   });
 
-  // Bewertung: Nicht gewusst / Nochmal
+  // Bewertung: Nochmal üben
   document.getElementById('btn-fail').addEventListener('click', () => {
     if (!currentVerse) return;
     currentVerse.box = 0; // Zurück auf Anfang
-    currentVerse.nextDue = Date.now() + (10 * 60 * 1000); // in 10 Min erneut zeigen
+    currentVerse.nextDue = Date.now() + (10 * 60 * 1000); // nach 10 Minuten wiederholen
 
     saveVerses();
     renderCard();
   });
 
-  // Neuen Vers anlegen
+  // Neuen Vers eintragen
   document.getElementById('btn-add').addEventListener('click', () => {
     const ref = document.getElementById('input-ref').value.trim();
     const text = document.getElementById('input-text').value.trim();
 
     if (!ref || !text) {
-      alert("Bitte Bibelstelle und Vers-Text eintragen!");
+      alert("Bitte Bibelstelle und Text ausfüllen!");
       return;
     }
 
@@ -218,7 +289,35 @@
     renderCard();
   });
 
-  // Initial starten
+  // Einstellungen speichern
+  document.getElementById('btn-save-settings').addEventListener('click', () => {
+    const newIntervals = [];
+    for (let i = 0; i < 5; i++) {
+      const val = parseInt(document.getElementById(`int-${i}`).value, 10);
+      if (isNaN(val) || val < 1) {
+        alert(`Bitte für Stufe ${i} eine gültige Tagesanzahl (mind. 1) eintragen!`);
+        return;
+      }
+      newIntervals.push(val);
+    }
+    intervals = newIntervals;
+    saveIntervals();
+    alert("Intervalle erfolgreich gespeichert!");
+    renderCard();
+  });
+
+  // Einstellungen zurücksetzen
+  document.getElementById('btn-reset-settings').addEventListener('click', () => {
+    if (confirm("Möchtest du wirklich alle Intervalle auf die Standardwerte zurücksetzen?")) {
+      intervals = [...DEFAULT_INTERVALS];
+      saveIntervals();
+      updateIntervalInputs();
+      renderCard();
+    }
+  });
+
+  // Initialisierung beim Laden
+  updateIntervalInputs();
   renderCard();
 </script>
 </body>
